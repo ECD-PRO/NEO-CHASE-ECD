@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+   <title>Neon Escape - Threat Levels</title>
+   <script src="https://cdn.tailwindcss.com"></script>
+   <style>
+       @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;900&family=JetBrains+Mono:wght@400;700&display=swap');
+      
+       body { margin: 0; overflow: hidden; background-color: #000; font-family: 'JetBrains Mono', monospace; touch-action: none; color: #fff; }
+       #gameCanvas { display: block; width: 100vw; height: 100vh; }
+      
+       .hud-container {
+           position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+           pointer-events: none; z-index: 10; padding: 25px;
+           display: flex; flex-direction: column; justify-content: space-between;
+       }
+
+
+       .glass-panel {
+           background: rgba(0, 0, 0, 0.7);
+           backdrop-filter: blur(8px);
+           border: 1px solid rgba(255, 255, 255, 0.1);
+           border-radius: 4px;
+           padding: 15px;
+       }
+
+
+       .level-card {
+           border: 1px solid #333;
+           transition: all 0.2s;
+           cursor: pointer;
+           position: relative;
+           overflow: hidden;
+       }
+       .level-card:hover { border-color: #fff; transform: translateY(-2px); }
+       .level-card.selected { border-color: #0ff; background: rgba(0, 255, 255, 0.15); }
+       .level-card.selected::after {
+           content: 'ACTIVE'; position: absolute; top: 5px; right: 5px;
+           font-size: 8px; font-weight: bold; color: #0ff;
+       }
+
+
+       .btn-primary {
+           background: #fff; color: #000; font-family: 'Orbitron', sans-serif;
+           font-weight: 900; letter-spacing: 2px; padding: 16px 48px;
+           clip-path: polygon(10% 0, 100% 0, 90% 100%, 0 100%);
+           transition: all 0.3s; cursor: pointer;
+       }
+       .btn-primary:hover { background: #0ff; transform: scale(1.05); }
+
+
+       .star { font-size: 1.5rem; color: rgba(255,255,255,0.1); transition: color 0.3s; }
+       .star.active { color: #0ff; text-shadow: 0 0 10px #0ff; }
+
+
+       .health-bar-container { width: 200px; height: 6px; background: rgba(255,255,255,0.1); margin-top: 10px; }
+       #healthFill { height: 100%; background: #0ff; width: 100%; transition: width 0.3s; }
+
+
+       .panel-center {
+           position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+           z-index: 50; width: 90%; max-width: 600px;
+       }
+
+
+       .glitch-text { font-family: 'Orbitron', sans-serif; text-transform: uppercase; }
+       .hidden { display: none; }
+   </style>
+</head>
+<body>
+
+
+   <!-- HUD -->
+   <div class="hud-container" id="hud">
+       <div class="flex justify-between items-start">
+           <div class="glass-panel">
+               <div class="text-[10px] opacity-50 uppercase tracking-[0.3em]">System.Telemetry</div>
+               <div class="text-3xl font-black italic tracking-tighter mb-1" id="scoreDisplay">00000</div>
+               <div class="flex items-center gap-2">
+                   <div class="text-[10px] uppercase font-bold text-cyan-400">Hull Integrity</div>
+                   <div class="health-bar-container"><div id="healthFill"></div></div>
+               </div>
+           </div>
+           <div class="glass-panel text-right">
+               <div class="text-[10px] opacity-50 uppercase tracking-[0.3em] mb-2">Threat_Level</div>
+               <div id="starContainer" class="flex gap-1">
+                   <span class="star">★</span><span class="star">★</span><span class="star">★</span><span class="star">★</span><span class="star">★</span>
+               </div>
+           </div>
+       </div>
+
+
+       <div id="warningMsg" class="w-full text-center text-red-500 font-bold hidden animate-pulse">
+           [ ! ] ARENA_LIMIT_REACHED: SIGNAL LOST [ ! ]
+       </div>
+
+
+       <div class="flex justify-between items-end">
+           <div class="text-[10px] opacity-30">V.4.0_STABLE_BUILD</div>
+           <div class="text-[10px] opacity-30 text-right uppercase" id="currentLevelNameDisplay">Intensity: Easy</div>
+       </div>
+   </div>
+
+
+   <canvas id="gameCanvas"></canvas>
+
+
+   <!-- MAIN MENU -->
+   <div id="menu" class="panel-center glass-panel p-10 border-cyan-900 border-2">
+       <h1 class="text-6xl font-black mb-1 glitch-text italic tracking-tighter">NEON<span class="text-cyan-400">ESCAPE</span></h1>
+       <p class="text-[10px] opacity-50 uppercase tracking-[0.5em] mb-8">Establish connection to server...</p>
+      
+       <div class="grid grid-cols-2 gap-8">
+           <div>
+               <div class="text-[10px] font-bold text-gray-500 uppercase mb-3 tracking-widest">Select Chassis</div>
+               <div class="grid grid-cols-1 gap-2">
+                   <div class="level-card p-3 rounded bg-black/50 selected" onclick="selectItem('car', 'sports', this)">
+                       <span class="text-sm">GT-NEON <span class="text-[10px] opacity-40 ml-2">BALANCED</span></span>
+                   </div>
+                   <div class="level-card p-3 rounded bg-black/50" onclick="selectItem('car', 'bike', this)">
+                       <span class="text-sm">PULSE <span class="text-[10px] opacity-40 ml-2">AGILE</span></span>
+                   </div>
+                   <div class="level-card p-3 rounded bg-black/50" onclick="selectItem('car', 'truck', this)">
+                       <span class="text-sm">BRUTE <span class="text-[10px] opacity-40 ml-2">TANK</span></span>
+                   </div>
+               </div>
+           </div>
+
+
+           <div>
+               <div class="text-[10px] font-bold text-gray-500 uppercase mb-3 tracking-widest">Threat Intensity</div>
+               <div class="grid grid-cols-1 gap-2">
+                   <div class="level-card p-2 rounded bg-black/50 selected" onclick="selectItem('level', 'easy', this)">
+                       <span class="text-xs">EASY</span>
+                   </div>
+                   <div class="level-card p-2 rounded bg-black/50" onclick="selectItem('level', 'hard', this)">
+                       <span class="text-xs">HARD</span>
+                   </div>
+                   <div class="level-card p-2 rounded bg-black/50" onclick="selectItem('level', 'harder', this)">
+                       <span class="text-xs">HARDER</span>
+                   </div>
+                   <div class="level-card p-2 rounded bg-black/50" onclick="selectItem('level', 'impossible', this)">
+                       <span class="text-xs text-red-400">IMPOSSIBLE</span>
+                   </div>
+                   <div class="level-card p-2 rounded bg-black/50 border-purple-900" onclick="selectItem('level', 'hacker', this)">
+                       <span class="text-xs text-purple-400">HACKER</span>
+                   </div>
+               </div>
+           </div>
+       </div>
+
+
+       <div class="mt-10 text-center">
+           <button class="btn-primary" onclick="startGame()">INITIATE</button>
+       </div>
+   </div>
+
+
+   <!-- GAME OVER -->
+   <div id="gameOver" class="panel-center glass-panel p-10 hidden text-center border-red-900 border-2">
+       <h1 class="text-6xl font-black mb-2 text-red-500 glitch-text">WASTED</h1>
+       <div class="text-[10px] opacity-50 uppercase tracking-[0.3em] mb-6">Simulation Terminated</div>
+       <p id="finalScore" class="text-3xl mb-8 font-mono">00000</p>
+       <button class="btn-primary" onclick="toggleMenu(true)">SYNC & RESTART</button>
+   </div>
+
+
+   <script>
+       const canvas = document.getElementById('gameCanvas');
+       const ctx = canvas.getContext('2d');
+       const scoreDisplay = document.getElementById('scoreDisplay');
+       const healthFill = document.getElementById('healthFill');
+       const starContainer = document.getElementById('starContainer');
+       const warningMsg = document.getElementById('warningMsg');
+
+
+       const WORLD_SIZE = 4500;
+
+
+       const LEVELS = {
+           easy: { name: 'EASY', density: 3, copSpdMult: 0.9, spawnRate: 0.02, friction: 0.98, accent: '#0ff' },
+           hard: { name: 'HARD', density: 5, copSpdMult: 1.1, spawnRate: 0.04, friction: 0.97, accent: '#f90' },
+           harder: { name: 'HARDER', density: 7, copSpdMult: 1.3, spawnRate: 0.06, friction: 0.96, accent: '#f00' },
+           impossible: { name: 'IMPOSSIBLE', density: 10, copSpdMult: 1.5, spawnRate: 0.08, friction: 0.95, accent: '#ff00ff' },
+           hacker: { name: 'HACKER', density: 15, copSpdMult: 1.8, spawnRate: 0.15, friction: 0.99, accent: '#0f0' }
+       };
+
+
+       const VEHICLES = {
+           sports: { acc: 0.38, max: 9, turn: 0.075, w: 42, h: 22, color: '#0ff' },
+           bike:   { acc: 0.60, max: 12, turn: 0.055, w: 28, h: 12, color: '#fff' },
+           truck:  { acc: 0.22, max: 6.5, turn: 0.095, w: 55, h: 32, color: '#0f8' }
+       };
+
+
+       const COP_TYPES = [
+           { name: 'Patrol', color: '#fff', spd: 5.4, turn: 0.048, w: 44, h: 24, starReq: 1 },
+           { name: 'Enforcer', color: '#666', spd: 4.6, turn: 0.040, w: 58, h: 34, starReq: 3 },
+           { name: 'Interceptor', color: '#ff4d4d', spd: 8.2, turn: 0.098, w: 38, h: 20, starReq: 4 }
+       ];
+
+
+       let currentCar = 'sports';
+       let currentLevel = 'easy';
+       let gameActive = false;
+       let score = 0;
+       let player = {};
+       let cops = [];
+       let worldOffset = { x: 0, y: 0 };
+       let keys = {};
+       let wantedLevel = 1;
+
+
+       window.addEventListener('keydown', e => keys[e.code] = true);
+       window.addEventListener('keyup', e => keys[e.code] = false);
+
+
+       function selectItem(category, id, el) {
+           if(category === 'car') currentCar = id;
+           if(category === 'level') currentLevel = id;
+           const parent = el.parentElement;
+           parent.querySelectorAll('.level-card').forEach(c => c.classList.remove('selected'));
+           el.classList.add('selected');
+       }
+
+
+       function toggleMenu(show) {
+           document.getElementById('menu').classList.toggle('hidden', !show);
+           document.getElementById('gameOver').classList.add('hidden');
+           document.getElementById('hud').classList.toggle('hidden', show);
+           gameActive = !show;
+       }
+
+
+       function startGame() {
+           const config = VEHICLES[currentCar];
+           const levelCfg = LEVELS[currentLevel];
+           player = {
+               x: 0, y: 0, angle: 0, vx: 0, vy: 0,
+               health: 100, invincibility: 0,
+               ...config
+           };
+           cops = [];
+           score = 0;
+           wantedLevel = 1;
+           document.getElementById('currentLevelNameDisplay').innerText = `Intensity: ${levelCfg.name}`;
+           toggleMenu(false);
+           updateHUD();
+           for(let i=0; i < levelCfg.density; i++) spawnCop();
+       }
+
+
+       function spawnCop() {
+           const levelCfg = LEVELS[currentLevel];
+           const angle = Math.random() * Math.PI * 2;
+           const availableTypes = COP_TYPES.filter(t => wantedLevel >= t.starReq);
+           const type = availableTypes[Math.floor(Math.random() * availableTypes.length)];
+          
+           cops.push({
+               x: player.x + Math.cos(angle) * 1100,
+               y: player.y + Math.sin(angle) * 1100,
+               angle: angle + Math.PI,
+               vx: 0, vy: 0,
+               ...type,
+               spd: type.spd * levelCfg.copSpdMult
+           });
+       }
+
+
+       function updateHUD() {
+           healthFill.style.width = `${player.health}%`;
+           healthFill.style.backgroundColor = player.health < 30 ? '#f00' : '#0ff';
+          
+           const stars = starContainer.querySelectorAll('.star');
+           stars.forEach((s, i) => {
+               s.classList.toggle('active', i < wantedLevel);
+               s.style.color = i < wantedLevel ? LEVELS[currentLevel].accent : '';
+           });
+       }
+
+
+       function drawSquareCar(x, y, angle, w, h, color, isCop) {
+           ctx.save();
+           ctx.translate(x + worldOffset.x, y + worldOffset.y);
+           ctx.rotate(angle);
+
+
+           // Shadow/Glow
+           ctx.shadowBlur = 15;
+           ctx.shadowColor = color;
+          
+           // Body
+           ctx.fillStyle = color;
+           ctx.fillRect(-w/2, -h/2, w, h);
+
+
+           // Windshield
+           ctx.shadowBlur = 0;
+           ctx.fillStyle = 'rgba(0,0,0,0.7)';
+           ctx.fillRect(w/6, -h/2.2, w/4, h/1.1);
+
+
+           if(isCop) {
+               const s = Math.floor(Date.now() / 150) % 2;
+               ctx.fillStyle = s ? '#f00' : '#00f';
+               ctx.fillRect(-w/10, -h/2, w/5, h);
+           }
+           ctx.restore();
+       }
+
+
+       function update() {
+           if(!gameActive) return;
+
+
+           const levelCfg = LEVELS[currentLevel];
+
+
+           if(keys['ArrowLeft'] || keys['KeyA']) player.angle -= player.turn;
+           if(keys['ArrowRight'] || keys['KeyD']) player.angle += player.turn;
+
+
+           player.vx += Math.cos(player.angle) * player.acc;
+           player.vy += Math.sin(player.angle) * player.acc;
+           player.vx *= levelCfg.friction;
+           player.vy *= levelCfg.friction;
+
+
+           player.x += player.vx;
+           player.y += player.vy;
+
+
+           const halfSize = WORLD_SIZE / 2;
+           let nearBoundary = false;
+           if (Math.abs(player.x) > halfSize) {
+               player.x = Math.sign(player.x) * halfSize;
+               player.vx *= -0.5;
+               nearBoundary = true;
+               player.health -= 0.1;
+           }
+           if (Math.abs(player.y) > halfSize) {
+               player.y = Math.sign(player.y) * halfSize;
+               player.vy *= -0.5;
+               nearBoundary = true;
+               player.health -= 0.1;
+           }
+           warningMsg.classList.toggle('hidden', !nearBoundary);
+
+
+           if(player.invincibility > 0) player.invincibility--;
+
+
+           worldOffset.x = canvas.width/2 - player.x;
+           worldOffset.y = canvas.height/2 - player.y;
+
+
+           // Slower Wanted Level progression
+           let oldLevel = wantedLevel;
+           if (score < 10000) wantedLevel = 1;
+           else if (score < 30000) wantedLevel = 2;
+           else if (score < 60000) wantedLevel = 3;
+           else if (score < 100000) wantedLevel = 4;
+           else wantedLevel = 5;
+
+
+           if (wantedLevel !== oldLevel) updateHUD();
+
+
+           cops.forEach((cop, i) => {
+               const angleToPlayer = Math.atan2(player.y - cop.y, player.x - cop.x);
+               let diff = angleToPlayer - cop.angle;
+               while(diff < -Math.PI) diff += Math.PI * 2;
+               while(diff > Math.PI) diff -= Math.PI * 2;
+              
+               cop.angle += diff * (cop.turn + (score/500000));
+               cop.x += Math.cos(cop.angle) * cop.spd;
+               cop.y += Math.sin(cop.angle) * cop.spd;
+
+
+               const dist = Math.hypot(player.x - cop.x, player.y - cop.y);
+               if(dist < (player.w + cop.w)/2 * 0.8 && player.invincibility <= 0) {
+                   player.health -= 20;
+                   player.invincibility = 40;
+                   player.vx *= -1.5;
+                   updateHUD();
+                   if(player.health <= 0) {
+                       gameActive = false;
+                       document.getElementById('gameOver').classList.remove('hidden');
+                       document.getElementById('finalScore').innerText = Math.floor(score/10).toString().padStart(5, '0');
+                   }
+               }
+
+
+               cops.forEach((other, j) => {
+                   if(i !== j && Math.hypot(cop.x - other.x, cop.y - other.y) < 40) {
+                       cops.splice(Math.max(i, j), 1);
+                       cops.splice(Math.min(i, j), 1);
+                       score += 2000;
+                   }
+               });
+           });
+
+
+           const maxCops = levelCfg.density + (wantedLevel * 2);
+           if(cops.length < maxCops && Math.random() < levelCfg.spawnRate) spawnCop();
+          
+           score++;
+           scoreDisplay.innerText = Math.floor(score/10).toString().padStart(5, '0');
+       }
+
+
+       function draw() {
+           const levelCfg = LEVELS[currentLevel];
+           ctx.fillStyle = '#050508';
+           ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+
+           // Arena
+           ctx.strokeStyle = levelCfg.accent;
+           ctx.lineWidth = 4;
+           ctx.strokeRect(-WORLD_SIZE/2 + worldOffset.x, -WORLD_SIZE/2 + worldOffset.y, WORLD_SIZE, WORLD_SIZE);
+
+
+           // Grid
+           ctx.strokeStyle = 'rgba(255,255,255,0.03)';
+           ctx.lineWidth = 1;
+           const sz = 150;
+           for(let x = worldOffset.x % sz; x < canvas.width; x += sz) {
+               ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+           }
+           for(let y = worldOffset.y % sz; y < canvas.height; y += sz) {
+               ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+           }
+
+
+           if(gameActive) {
+               cops.forEach(c => drawSquareCar(c.x, c.y, c.angle, c.w, c.h, c.color, true));
+               if(player.invincibility % 4 < 2) {
+                   drawSquareCar(player.x, player.y, player.angle, player.w, player.h, player.color, false);
+               }
+               update();
+           }
+
+
+           requestAnimationFrame(draw);
+       }
+
+
+       window.addEventListener('resize', () => {
+           canvas.width = window.innerWidth;
+           canvas.height = window.innerHeight;
+       });
+       canvas.width = window.innerWidth;
+       canvas.height = window.innerHeight;
+       draw();
+   </script>
+</body>
+</html>
